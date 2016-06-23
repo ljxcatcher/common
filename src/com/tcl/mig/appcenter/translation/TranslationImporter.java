@@ -207,7 +207,7 @@ public class TranslationImporter {
 
         // app翻译表已做分表处理
         int tabNo = appI18nInfo.getAppId() % 20;
-        String sql = "INSERT INTO ostore_app_translation.os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
+        String sql = "SET NAMES utf8mb4; INSERT INTO ostore_app_translation.os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
                 " VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE app_name = ?, app_summary = ?, description = ?";
 
         try {
@@ -223,13 +223,13 @@ public class TranslationImporter {
             acStmt.setString(6, appI18nInfo.getName());
             acStmt.setString(7, appI18nInfo.getSummary());
             acStmt.setString(8, appI18nInfo.getDescription());
-            row = acStmt.executeUpdate();
 
+            acStmt.executeUpdate();
         } catch (Exception e) {
-            messLog.error("发生未知异常:", e);
+            messLog.error("更新翻译时发生异常:", e);
         }
 
-        return row;
+        return 1;
     }
 
     private static int insertComments(AppI18nInfo appI18nInfo) {
@@ -239,14 +239,13 @@ public class TranslationImporter {
             return row;
         }
 
-        int tabNo = appI18nInfo.getAppId() % 20;
-        String sql = "SELECT COUNT(id) FROM os_user_comment_" + tabNo + " WHERE app_id=? AND language=?";
-
         List<CommentInfo> commentInfos = appI18nInfo.getCommentInfoList();
         if (commentInfos == null || commentInfos.isEmpty()) {
             return row;
         }
 
+        int tabNo = appI18nInfo.getAppId() % 20;
+        String sql = "SELECT id FROM os_user_comment_" + tabNo + " WHERE app_id=? AND language=? LIMIT 1";
         PreparedStatement ucStmt = ucStmtMap.get(tabNo);
         ResultSet rs = null;
         int count = 0;
@@ -263,18 +262,20 @@ public class TranslationImporter {
                 count = rs.getInt(1);
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            messLog.error("添加评论时发生异常:", e);
         }
 
-        for (CommentInfo commentInfo : commentInfos) {
-            // 如果相应app id和语言的评论已经存在，则不添加评论了
-            if(count > 0) {
-                break;
+        // 如果没有相应app id和language的评论，则添加评论；否则不添加
+        if(count == 0) {
+            for (CommentInfo commentInfo : commentInfos) {
+                row += insertComments(commentInfo);
             }
-            row += insertComments(commentInfo);
+            return row;
+        } else {
+            return row;
         }
 
-        return row;
+
     }
 
     private static int insertComments(CommentInfo commentInfo) {
