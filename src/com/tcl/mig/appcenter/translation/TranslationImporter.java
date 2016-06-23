@@ -239,12 +239,38 @@ public class TranslationImporter {
             return row;
         }
 
+        int tabNo = appI18nInfo.getAppId() % 20;
+        String sql = "SELECT COUNT(id) FROM os_user_comment_" + tabNo + " WHERE app_id=? AND language=?";
+
         List<CommentInfo> commentInfos = appI18nInfo.getCommentInfoList();
         if (commentInfos == null || commentInfos.isEmpty()) {
             return row;
         }
 
+        PreparedStatement ucStmt = ucStmtMap.get(tabNo);
+        ResultSet rs = null;
+        int count = 0;
+
+        try {
+            if (ucStmt == null) {
+                ucStmt = ucConn.prepareStatement(sql);
+                ucStmtMap.put(tabNo, ucStmt);
+            }
+            ucStmt.setInt(1, appI18nInfo.getAppId());
+            ucStmt.setString(2, appI18nInfo.getLanguage());
+            rs = ucStmt.executeQuery();
+            if(rs.next()) {
+                count = rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
         for (CommentInfo commentInfo : commentInfos) {
+            // 如果相应app id和语言的评论已经存在，则不添加评论了
+            if(count > 0) {
+                break;
+            }
             row += insertComments(commentInfo);
         }
 
