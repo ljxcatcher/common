@@ -41,7 +41,7 @@ public class TranslationImporter {
     private static PreparedStatement idStmt;
     private static PreparedStatement acStmt;
     private static Connection ucConn; // 用户评论
-    private static Map<Integer, PreparedStatement> ucStmtMap = new HashMap<>();
+    private static Map<String, PreparedStatement> ucStmtMap = new HashMap<>();
 
     private static String getFile(String fileName) {
         URL url = TranslationImporter.class.getResource("/" + fileName);
@@ -177,7 +177,7 @@ public class TranslationImporter {
 
                 if (!line.trim().startsWith("#")) {
                     AppI18nInfo appI18nInfo = parseAppI18nInfo(line);
-                    if (appI18nInfo == null) {
+                    if (appI18nInfo == null || appI18nInfo.getAppId() == -1) {
                         messLog.error("Parse app info by json error, json: {}", line);
                         continue;
                     }
@@ -257,7 +257,7 @@ public class TranslationImporter {
             PreparedStatement ucStmt = ucStmtMap.get(tabNo);
             if (ucStmt == null) {
                 ucStmt = ucConn.prepareStatement(sql);
-                ucStmtMap.put(tabNo, ucStmt);
+                ucStmtMap.put(tabNo + "_" + "SELECT", ucStmt);
             }
 
             ucStmt.setInt(1, appI18nInfo.getAppId());
@@ -303,7 +303,7 @@ public class TranslationImporter {
             PreparedStatement ucStmt = ucStmtMap.get(tabNo);
             if (ucStmt == null) {
                 ucStmt = ucConn.prepareStatement(sql);
-                ucStmtMap.put(tabNo, ucStmt);
+                ucStmtMap.put(tabNo + "_" + "INSERT", ucStmt);
             }
 
             ucStmt.setInt(1, -1);//字段值为-1
@@ -343,7 +343,7 @@ public class TranslationImporter {
 
     // 从数据库中查询需要验证的App
     private static int queryAppId(String packageName) {
-        String sql = "SELECT id FROM os_app_entity WHERE app_package=?";
+        String sql = "SELECT id FROM ostore.os_app_entity WHERE app_package=?";
         try {
 
             if (idStmt == null) {
@@ -396,7 +396,7 @@ public class TranslationImporter {
         }
 
         if (!ucStmtMap.isEmpty()) {
-            for (Map.Entry<Integer, PreparedStatement> entry : ucStmtMap.entrySet()) {
+            for (Map.Entry<String, PreparedStatement> entry : ucStmtMap.entrySet()) {
                 if (entry.getValue() != null) {
                     try {
                         entry.getValue().close();
