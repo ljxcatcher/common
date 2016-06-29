@@ -13,6 +13,7 @@ public class AppI18nInfo {
     private String name;// 名称
     private String summary; // 描述
     private String description; // 描述
+    private int transed = -1; // -1未分辨，1翻译，0原始
     private String originIconUrl; // 图标
     private String originScreenshots; // 截图
 
@@ -67,6 +68,14 @@ public class AppI18nInfo {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public int getTransed() {
+        return transed;
+    }
+
+    public void setTransed(int transed) {
+        this.transed = transed;
     }
 
     public String getOriginIconUrl() {
