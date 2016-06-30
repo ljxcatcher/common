@@ -72,7 +72,7 @@ public class IOUtil {
         PrintWriter writer = null;
         try {
             String fullPath = getFile("") + importDataLog;
-            writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath)), true);
+            writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath, true)));
             writer.println(data);
         } catch (Exception e) {
             messLog.error("写入包名和语言异常！", e);
