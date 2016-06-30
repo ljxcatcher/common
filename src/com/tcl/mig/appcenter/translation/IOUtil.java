@@ -116,7 +116,7 @@ public class IOUtil {
         PrintWriter writer = null;
         try {
             String fullPath = getFile("") + importOffsetLog;
-            writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath)));
+            writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath, false)));
             writer.println(offset);
         } catch (Exception e) {
             messLog.error("写入offset异常！", e);
