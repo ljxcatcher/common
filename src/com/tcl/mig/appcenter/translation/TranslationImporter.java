@@ -6,12 +6,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -32,6 +28,8 @@ import java.util.Map;
 public class TranslationImporter {
     private final static Logger messLog = LoggerFactory.getLogger(TranslationImporter.class);
 
+    private static int STEP = 10;
+    private static int REPEAT = 3;
     private static String CONF_FILE_NAME = "range.conf";
 
 
@@ -55,26 +53,13 @@ public class TranslationImporter {
     private static Map<String, PreparedStatement> ucStmtMap = new HashMap<>();
 
 
-    private static String getFile(String fileName) {
-        if (fileName.startsWith("/") || fileName.matches("^[a-zA-Z]:.*")) {
-            return fileName;
-        }
-
-        URL url = TranslationImporter.class.getResource("/" + fileName);
-        if (url != null) {
-            return url.getFile();
-        }
-
-        return null;
-    }
-
     // 读取配置文件
     private static boolean loadConfig() {
         Map<String, String> configMap = new HashMap<>();
         BufferedReader buffer = null;
         try {
 
-            String fullPath = getFile(CONF_FILE_NAME);
+            String fullPath = IOUtil.getFile(CONF_FILE_NAME);
             if (fullPath == null) {
                 throw new Exception("获取配置文件路径错误！");
             }
@@ -116,7 +101,7 @@ public class TranslationImporter {
         if (nlflags != null && nlflags.length() > 0) {
             importNewlineFlag = nlflags.split("\\|");
         }
-        String elflags = configMap.get("import.newline.flag");
+        String elflags = configMap.get("import.endline.flag");
         if (elflags != null && elflags.length() > 0) {
             importEndlineFlag = elflags.split("\\|");
         }
@@ -126,91 +111,16 @@ public class TranslationImporter {
         return true;
     }
 
-    // 加载所有待提取的App
-    private static int loadOffset() {
-        BufferedReader buffer = null;
-        try {
-
-            String fullPath = getFile(importDataLog);
-            if (fullPath == null) {
-                throw new RuntimeException("获取数据文件路径错误！");
-            }
-
-            buffer = new BufferedReader(new InputStreamReader(new FileInputStream(fullPath)));
-            String line;
-            while ((line = buffer.readLine()) != null) {
-                if (!line.trim().startsWith("#")) {
-                    return Integer.valueOf(line.trim());
-                }
-            }
-        } catch (Exception e) {
-            messLog.error("读取范围ID配置异常！", e);
-        } finally {
-            if (buffer != null) {
-                try {
-                    buffer.close();
-                } catch (IOException e) {
-                    messLog.error("关闭配置读取流异常！", e);
-                }
-            }
-        }
-
-        return -1;
-    }
-
-    private static int writeDataLog(List<String> packageLanguages) {
-        PrintWriter writer = null;
-        try {
-            String fullPath = importDataLog;
-            writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath)), true);
-            for (String pl : packageLanguages) {
-                writer.println(pl);
-            }
-        } catch (Exception e) {
-            messLog.error("写入包名和语言异常！", e);
-        } finally {
-            if (writer != null) {
-                try {
-                    writer.close();
-                } catch (Exception e) {
-                    messLog.error("关闭写入包名和语言流异常！", e);
-                }
-            }
-        }
-
-        return 0;
-    }
-
-    private static int writeOffsetLog(int offset) {
-        PrintWriter writer = null;
-        try {
-            String fullPath = importOffsetLog;
-            writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath)), true);
-            writer.println(offset);
-        } catch (Exception e) {
-            messLog.error("写入offset异常！", e);
-        } finally {
-            if (writer != null) {
-                try {
-                    writer.close();
-                } catch (Exception e) {
-                    messLog.error("关闭写入offset流异常！", e);
-                }
-            }
-        }
-
-        return 0;
-    }
 
     // 加载提取成功的App
     private static void loadTranslations() {
         int aCount = 0;
         int cCount = 0;
-        int offset = loadOffset(); // 首次获取为-1
+        int offset = IOUtil.loadOffset(importOffsetLog); // 首次获取为-1
 
         BufferedReader reader = null;
         try {
-            String fullPath = getFile(importDataFile);
+            String fullPath = IOUtil.getFile(importDataFile);
             if (fullPath == null) {
                 throw new RuntimeException("获取数据文件路径错误！");
             }
@@ -243,16 +153,16 @@ public class TranslationImporter {
                 aCount += updateAppTrans(appI18nInfo);
                 cCount += insertComments(appI18nInfo);
 
-                if(appI18nInfo.getTransed() == 0 || appI18nInfo.getTransed() == 1){
+                if (appI18nInfo.getTransed() == 0 || appI18nInfo.getTransed() == 1) {
                     packageLangs.add(appI18nInfo.getPackageName() + ":" + appI18nInfo.getLanguage());
                 }
 
-                if (offset % 50 == 0) {
-                    writeOffsetLog(offset);
+                if (offset % 2 == 0) {
+                    IOUtil.writeOffsetLog(offset, importOffsetLog);
                     messLog.info("截止现在，导入 {} 个App描述，导入 {} 个App评论，轮询了 {} 行", aCount, cCount, offset);
                     messLog.error("截止现在，导入 {} 个App描述，导入 {} 个App评论，轮询了 {} 行", aCount, cCount, offset);
 
-                    writeDataLog(packageLangs);
+                    IOUtil.writeDataLog(packageLangs, importDataLog);
                 }
 
             }
@@ -268,7 +178,7 @@ public class TranslationImporter {
             }
         }
 
-        writeOffsetLog(offset);
+        IOUtil.writeOffsetLog(offset, importOffsetLog);
         messLog.info("截止现在，导入 {} 个App描述，导入 {} 个App评论，轮询了 {} 行", aCount, cCount, offset);
     }
 
@@ -284,7 +194,7 @@ public class TranslationImporter {
                 " INSERT INTO os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
                 " VALUES (?, ?, ?, ?, ?)" +
                 " ON DUPLICATE KEY UPDATE app_name = ?, app_summary = ?, description = ?";
-
+        IOUtil.writeData(tabNo + " " + appI18nInfo.getDescription(), "package.data.txt"); // 检测代码
         try {
             if (acStmt == null) {
                 acStmt = acConn.prepareStatement(sql);
@@ -498,7 +408,13 @@ public class TranslationImporter {
         // 转换App翻译
         AppI18nInfo appI18nInfo = JSON.parseObject(items[2], AppI18nInfo.class);
         appI18nInfo.setAppId(id);
+        if (language.startsWith("zh")) {
+            language = language.replace("-", "_");
+        } else if (language.length() > 2) {
+            language = language.substring(0, 2);
+        }
         appI18nInfo.setLanguage(language);
+
 
         // 格式化描述
         appI18nInfo.setDescription(formatDesc(appI18nInfo.getDescription()));
@@ -544,11 +460,19 @@ public class TranslationImporter {
 
     //格式化描述：无换行的在有特殊符号前增加换行；多个换行符变成一个换行
     private static String formatDesc(String description) {
+        // 替换html符号
         description = replace2Html(description);
+
+        // 替换多余换行，后面采集时增加了换行：可能有多个换行符
         if (description.contains("\n\n")) {
-            return replaceNewline(description);
+            return description.replaceAll("\n{2,}", "\n");
+
+        } else if(description.contains("\n")){
+            // 存在单个换行符则不格式化，后面采集时增加了换行：只能有一个换行符
+            return description;
         }
 
+        // 计算需要换行的符号
         List<String> newlineFlags = new ArrayList<>();
         for (String flag : importNewlineFlag) {
             if (ge3Repeat(description, flag)) {
@@ -556,6 +480,7 @@ public class TranslationImporter {
             }
         }
 
+        // 添加多个换行，前面采集未增加换行
         StringBuffer sb = new StringBuffer(description);
         for (String flag : newlineFlags) {
             addNewline(sb, flag);
@@ -565,16 +490,11 @@ public class TranslationImporter {
     }
 
     private static String replace2Html(String description) {
-        if (description.contains("& # 8195;")) {
-            description = description.replace("& # 8195;", " ");
-            description = description.replace("& # 8226;", "•");
+        if (description.contains("&amp; # 8195;")) {
+            description = description.replace("&amp; # 8195;", " ");
+            description = description.replace("&amp; # 8226;", "•");
         }
         return description;
-    }
-
-    private static String replaceNewline(String description) {
-        description = description.replace("\n\n\n", "\n");
-        return description.replace("\n\n", "\n");
     }
 
     private static void addNewline(StringBuffer description, String newlineFlag) {
@@ -583,26 +503,30 @@ public class TranslationImporter {
             if (isEndlineFlag(description, idx)) {
                 description.insert(idx, "\n");
             }
-            idx = description.indexOf(newlineFlag, idx + newlineFlag.length());
+            // 因新行符号跟前1个新行符号相差距离大于10，再因\n在idx后一位，所以加STEP值
+            idx = description.indexOf(newlineFlag, idx + newlineFlag.length() + STEP);
         }
     }
 
     // 判断前一个非空格字符是否为每行的结尾字符
     private static boolean isEndlineFlag(StringBuffer description, int idx) {
-        char c = '0';
+        char c1 = '0';
+        char c2 = '0';
 
         while (true) {
             if (idx > 0) {
-                c = description.charAt(--idx);
+                c1 = description.charAt(--idx);
             }
 
-            if (c != ' ' && c != '\t') {
+            if (c1 != ' ' && c1 != '\t') {
                 break;
+            } else {
+                c2 = c1; // 有些描述在新行符前面有空格没标点符号
             }
         }
 
         for (String flag : importEndlineFlag) {
-            if (flag.equals(String.valueOf(c))) {
+            if (flag.equals(String.valueOf(c1)) || flag.equals(String.valueOf(c2))) {
                 return true;
             }
         }
@@ -617,11 +541,14 @@ public class TranslationImporter {
         int idx = description.indexOf(flag, 0);
         while (idx > 0) {
             i++;
+            if (i >= REPEAT) {
+                return true;
+            }
             // 一个标志在描述中出现3次及以上且不连续才可能为新行的开始标志，如：五角星
-            idx = description.indexOf(flag, flag.length() + 10);
+            idx = description.indexOf(flag, idx + flag.length() + STEP);
         }
 
-        return i > 3;
+        return false;
     }
 
     public static void execute() {
