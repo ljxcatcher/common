@@ -126,7 +126,7 @@ public class TranslationImporter {
             }
 
             String line;
-            List<String> packageLangs = new ArrayList<>();
+            List<String> packageLanguages = new ArrayList<>();
             reader = new BufferedReader(new InputStreamReader(new FileInputStream(fullPath)));
             for (int i = 0; (line = reader.readLine()) != null; i++) {
                 if (i <= offset) {
@@ -154,15 +154,15 @@ public class TranslationImporter {
                 cCount += insertComments(appI18nInfo);
 
                 if (appI18nInfo.getTransed() == 0 || appI18nInfo.getTransed() == 1) {
-                    packageLangs.add(appI18nInfo.getPackageName() + ":" + appI18nInfo.getLanguage());
+                    packageLanguages.add(appI18nInfo.getPackageName() + ":" + appI18nInfo.getLanguage());
                 }
 
-                if (offset % 2 == 0) {
+                if (offset % 50 == 0) {
                     IOUtil.writeOffsetLog(offset, importOffsetLog);
                     messLog.info("截止现在，导入 {} 个App描述，导入 {} 个App评论，轮询了 {} 行", aCount, cCount, offset);
                     messLog.error("截止现在，导入 {} 个App描述，导入 {} 个App评论，轮询了 {} 行", aCount, cCount, offset);
 
-                    IOUtil.writeDataLog(packageLangs, importDataLog);
+                    IOUtil.writeDataLog(packageLanguages, importDataLog);
                 }
 
             }
@@ -194,7 +194,8 @@ public class TranslationImporter {
                 " INSERT INTO os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
                 " VALUES (?, ?, ?, ?, ?)" +
                 " ON DUPLICATE KEY UPDATE app_name = ?, app_summary = ?, description = ?";
-        IOUtil.writeData("\r\n"+tabNo + " " + appI18nInfo.getDescription(), "package.data.txt"); // 检测代码
+//        IOUtil.writeData("\r\n"+tabNo + " " + appI18nInfo.getDescription(), "package.data.txt"); // 检测代码
+
         try {
             if (acStmt == null) {
                 acStmt = acConn.prepareStatement(sql);
