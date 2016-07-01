@@ -194,7 +194,7 @@ public class TranslationImporter {
                 " INSERT INTO os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
                 " VALUES (?, ?, ?, ?, ?)" +
                 " ON DUPLICATE KEY UPDATE app_name = ?, app_summary = ?, description = ?";
-        IOUtil.writeData("\r\n" + tabNo + "::" + appI18nInfo.getAppId() + "::" + appI18nInfo.getPackageName() + "::" + appI18nInfo.getLanguage() + "-->" + appI18nInfo.getDescription(), "package.data.txt"); // 检测代码
+        messLog.info("tabNo: {}, appId: {}, appPackage: {}, language: {}", tabNo, appI18nInfo.getAppId(), appI18nInfo.getPackageName(), appI18nInfo.getLanguage());
 
         try {
             if (acStmt == null) {
