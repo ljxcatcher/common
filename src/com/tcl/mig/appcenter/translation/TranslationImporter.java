@@ -500,6 +500,10 @@ public class TranslationImporter {
             description = description.replace("& # 8195;", " ");
             description = description.replace("& # 8226;", "•");
         }
+
+        if (description.contains("&nbsp;")) {
+            description = description.replace("&nbsp;", " ");
+        }
         return description;
     }
 
