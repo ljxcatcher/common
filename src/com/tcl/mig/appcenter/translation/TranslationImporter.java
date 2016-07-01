@@ -49,7 +49,7 @@ public class TranslationImporter {
     private static Connection acConn; // App翻译
     private static Connection ucConn; // 用户评论
     private static PreparedStatement idStmt;
-    private static PreparedStatement acStmt;
+    private static Map<String, PreparedStatement> acStmtMap = new HashMap<>();
     private static Map<String, PreparedStatement> ucStmtMap = new HashMap<>();
 
 
@@ -159,8 +159,7 @@ public class TranslationImporter {
 
                 if (offset % 50 == 0) {
                     IOUtil.writeOffsetLog(offset, importOffsetLog);
-                    messLog.info("截止现在，导入 {} 个App描述，导入 {} 个App评论，轮询了 {} 行", aCount, cCount, offset);
-                    messLog.error("截止现在，导入 {} 个App描述，导入 {} 个App评论，轮询了 {} 行", aCount, cCount, offset);
+                    messLog.error("截止现在，导入：{} 个App描述，导入：{} 个App评论，循环offset：{} 行", aCount, cCount, offset);
 
                     IOUtil.writeDataLog(packageLanguages, importDataLog);
                 }
@@ -179,7 +178,7 @@ public class TranslationImporter {
         }
 
         IOUtil.writeOffsetLog(offset, importOffsetLog);
-        messLog.info("截止现在，导入 {} 个App描述，导入 {} 个App评论，轮询了 {} 行", aCount, cCount, offset);
+        messLog.error("提取结束，导入：{} 个App描述，导入：{} 个App评论，循环offset：{} 行", aCount, cCount, offset);
     }
 
     private static int updateAppTrans(AppI18nInfo appI18nInfo) {
@@ -190,15 +189,17 @@ public class TranslationImporter {
 
         // app翻译表已做分表处理
         int tabNo = appI18nInfo.getAppId() % 20;
-        String sql = "SET NAMES utf8mb4;" +
-                " INSERT INTO os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
+        String sql = "INSERT INTO os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
                 " VALUES (?, ?, ?, ?, ?)" +
                 " ON DUPLICATE KEY UPDATE app_name = ?, app_summary = ?, description = ?";
         messLog.info("tabNo: {}, appId: {}, appPackage: {}, language: {}", tabNo, appI18nInfo.getAppId(), appI18nInfo.getPackageName(), appI18nInfo.getLanguage());
 
         try {
+            PreparedStatement acStmt = acStmtMap.get(String.valueOf(tabNo));
             if (acStmt == null) {
+                acConn.prepareStatement("SET NAMES utf8mb4").executeQuery();
                 acStmt = acConn.prepareStatement(sql);
+                acStmtMap.put(String.valueOf(tabNo), acStmt);
             }
 
             acStmt.setInt(1, appI18nInfo.getAppId());
@@ -210,8 +211,7 @@ public class TranslationImporter {
             acStmt.setString(7, appI18nInfo.getSummary());
             acStmt.setString(8, appI18nInfo.getDescription());
 
-            acStmt.executeUpdate(); // 因增加set子句，执行后返回行数0
-            row = 1;
+            row = acStmt.executeUpdate(); // 因增加set子句，执行后返回行数0
 
         } catch (Exception e) {
             messLog.error("更新翻译时发生异常:", e);
@@ -227,7 +227,6 @@ public class TranslationImporter {
         if (appI18nInfo == null) {
             return row;
         }
-
         List<CommentInfo> commentInfos = appI18nInfo.getCommentInfoList();
         if (commentInfos == null || commentInfos.isEmpty()) {
             return row;
@@ -235,13 +234,15 @@ public class TranslationImporter {
 
         int count = 0;
         int tabNo = appI18nInfo.getAppId() % 20;
+        String key = "SELECT" + "_" + tabNo;
+
         String sql = "SELECT id FROM os_user_comment_" + tabNo + " WHERE app_id=? AND language=? LIMIT 1";
 
         try {
-            PreparedStatement ucStmt = ucStmtMap.get(tabNo);
+            PreparedStatement ucStmt = ucStmtMap.get(key);
             if (ucStmt == null) {
                 ucStmt = ucConn.prepareStatement(sql);
-                ucStmtMap.put(tabNo + "_" + "SELECT", ucStmt);
+                ucStmtMap.put(key, ucStmt);
             }
 
             ucStmt.setInt(1, appI18nInfo.getAppId());
@@ -254,7 +255,7 @@ public class TranslationImporter {
             messLog.error("添加评论时发生异常:", e);
         }
 
-        // 如果没有相应app id和language的评论，则添加评论；否则不添加
+        // 如果存在相应appId和language的评论则不添加
         if (count > 0) {
             return row;
         }
@@ -267,9 +268,16 @@ public class TranslationImporter {
     }
 
     private static int insertComments(CommentInfo commentInfo) {
+        int row = 0;
+        if(commentInfo == null){
+            return row;
+        }
+
         int tabNo = commentInfo.getAppId() % 20;
+        String key = "INSERT" + "_" + tabNo;
+
         // 在每次插入评论前需先指定names utf8mb4，否则可能会因为content字段中的二字节、三字节、四字节字符报异常
-        String sql = "SET NAMES utf8mb4; INSERT INTO os_user_comment_" + tabNo +
+        String sql = "INSERT INTO os_user_comment_" + tabNo +
                 "(parent_id," +
                 " app_id," +
                 " app_package," +
@@ -283,11 +291,11 @@ public class TranslationImporter {
                 " critic_type)" +
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try {
-
-            PreparedStatement ucStmt = ucStmtMap.get(tabNo);
+            PreparedStatement ucStmt = ucStmtMap.get(key);
             if (ucStmt == null) {
+                ucConn.prepareStatement("SET NAMES utf8mb4").executeQuery();
                 ucStmt = ucConn.prepareStatement(sql);
-                ucStmtMap.put(tabNo + "_" + "INSERT", ucStmt);
+                ucStmtMap.put(key, ucStmt);
             }
 
             ucStmt.setInt(1, -1);//字段值为-1
@@ -302,15 +310,13 @@ public class TranslationImporter {
             ucStmt.setString(10, commentInfo.getLanguage());//语言
             ucStmt.setString(11, "AUTO");//评论者类型：机器
 
-            ucStmt.executeUpdate(); // 因增加set子句，执行后返回行数0
-
-            return 1;
+            row = ucStmt.executeUpdate(); // 因增加set子句，执行后返回行数0
 
         } catch (Exception e) {
             messLog.error("发生未知异常:", e);
         }
 
-        return 0;
+        return row;
     }
 
     // 截短字符串，评论实体中content字段可能过长，需要截短
@@ -361,11 +367,15 @@ public class TranslationImporter {
                 messLog.error("关闭idStmt异常！", e);
             }
         }
-        if (acStmt != null) {
-            try {
-                acStmt.close();
-            } catch (SQLException e) {
-                messLog.error("关闭acStmt异常！", e);
+        if (!acStmtMap.isEmpty()) {
+            for (Map.Entry<String, PreparedStatement> entry : acStmtMap.entrySet()) {
+                if (entry.getValue() != null) {
+                    try {
+                        entry.getValue().close();
+                    } catch (SQLException e) {
+                        messLog.error("关闭acStmt异常！", e);
+                    }
+                }
             }
         }
         if (acConn != null) {
@@ -468,7 +478,7 @@ public class TranslationImporter {
         if (description.contains("\n\n")) {
             return description.replaceAll("\n{2,}", "\n");
 
-        } else if(description.contains("\n")){
+        } else if (description.contains("\n")) {
             // 存在单个换行符则不格式化，后面采集时增加了换行：只能有一个换行符
             return description;
         }
@@ -545,7 +555,7 @@ public class TranslationImporter {
     }
 
     // 匹配新行符
-    private static List<String> matchNewlineFlags(String description){
+    private static List<String> matchNewlineFlags(String description) {
         // 计算需要换行的符号
         List<String> newlineFlags = new ArrayList<>();
         for (String flag : importNewlineFlag) {
@@ -587,7 +597,7 @@ public class TranslationImporter {
         long e = System.currentTimeMillis();
 
         closeConn();  // 关闭连接
-        messLog.info("导入结束，共耗时：{}秒", (e - b) / 1000);
+        messLog.error("提取结束，共耗时：{}秒", (e - b) / 1000);
     }
 
 
