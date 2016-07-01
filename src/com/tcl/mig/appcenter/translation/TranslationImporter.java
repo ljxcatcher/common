@@ -30,7 +30,7 @@ public class TranslationImporter {
 
     private static int STEP = 10;
     private static int REPEAT = 3;
-    private static String CONF_FILE_NAME = "range.conf";
+    private static String CONF_FILE_NAME = "import.conf";
 
 
     private static String importDataFile;
@@ -151,7 +151,7 @@ public class TranslationImporter {
                 }
 
                 aCount += updateAppTrans(appI18nInfo);
-                cCount += insertComments(appI18nInfo);
+//                cCount += insertComments(appI18nInfo);
 
                 if (appI18nInfo.getTransed() == 0 || appI18nInfo.getTransed() == 1) {
                     packageLanguages.add(appI18nInfo.getPackageName() + ":" + appI18nInfo.getLanguage());
@@ -194,7 +194,7 @@ public class TranslationImporter {
                 " INSERT INTO os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
                 " VALUES (?, ?, ?, ?, ?)" +
                 " ON DUPLICATE KEY UPDATE app_name = ?, app_summary = ?, description = ?";
-//        IOUtil.writeData("\r\n"+tabNo + " " + appI18nInfo.getDescription(), "package.data.txt"); // 检测代码
+        IOUtil.writeData("\r\n" + tabNo + "::" + appI18nInfo.getAppId() + "::" + appI18nInfo.getPackageName() + "::" + appI18nInfo.getLanguage() + "-->" + appI18nInfo.getDescription(), "package.data.txt"); // 检测代码
 
         try {
             if (acStmt == null) {
