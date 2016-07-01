@@ -194,7 +194,7 @@ public class TranslationImporter {
                 " INSERT INTO os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
                 " VALUES (?, ?, ?, ?, ?)" +
                 " ON DUPLICATE KEY UPDATE app_name = ?, app_summary = ?, description = ?";
-        IOUtil.writeData(tabNo + " " + appI18nInfo.getDescription(), "package.data.txt"); // 检测代码
+        IOUtil.writeData("\r\n"+tabNo + " " + appI18nInfo.getDescription(), "package.data.txt"); // 检测代码
         try {
             if (acStmt == null) {
                 acStmt = acConn.prepareStatement(sql);
@@ -473,12 +473,7 @@ public class TranslationImporter {
         }
 
         // 计算需要换行的符号
-        List<String> newlineFlags = new ArrayList<>();
-        for (String flag : importNewlineFlag) {
-            if (ge3Repeat(description, flag)) {
-                newlineFlags.add(flag);
-            }
-        }
+        List<String> newlineFlags = matchNewlineFlags(description);
 
         // 添加多个换行，前面采集未增加换行
         StringBuffer sb = new StringBuffer(description);
@@ -493,6 +488,16 @@ public class TranslationImporter {
         if (description.contains("&amp; # 8195;")) {
             description = description.replace("&amp; # 8195;", " ");
             description = description.replace("&amp; # 8226;", "•");
+        }
+
+        if (description.contains("＆＃8195;")) {
+            description = description.replace("＆＃8195;", " ");
+            description = description.replace("＆＃8226;", "•");
+        }
+
+        if (description.contains("& # 8195;")) {
+            description = description.replace("& # 8195;", " ");
+            description = description.replace("& # 8226;", "•");
         }
         return description;
     }
@@ -534,8 +539,21 @@ public class TranslationImporter {
         return false;
     }
 
+    // 匹配新行符
+    private static List<String> matchNewlineFlags(String description){
+        // 计算需要换行的符号
+        List<String> newlineFlags = new ArrayList<>();
+        for (String flag : importNewlineFlag) {
+            if (ge3RepeatNewlineFlag(description, flag)) {
+                newlineFlags.add(flag);
+            }
+        }
+
+        return newlineFlags;
+    }
+
     // 同一个符号重复三次以上
-    private static boolean ge3Repeat(String description, String flag) {
+    private static boolean ge3RepeatNewlineFlag(String description, String flag) {
         int i = 0;
 
         int idx = description.indexOf(flag, 0);
