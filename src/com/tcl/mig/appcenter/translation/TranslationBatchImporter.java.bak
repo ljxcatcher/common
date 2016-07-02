@@ -27,12 +27,11 @@ import java.util.Set;
  * @date: 2016-06-20 16:24
  * @since 1.0
  */
-public class TranslationImporter {
-    private final static Logger messLog = LoggerFactory.getLogger(TranslationImporter.class);
+public class TranslationBatchImporter {
+    private final static Logger messLog = LoggerFactory.getLogger(TranslationBatchImporter.class);
 
     private static int STEP = 10;
     private static int REPEAT = 3;
-    private static int SHARD_TOTAL = 100;
     private static String CONF_FILE_NAME = "import.conf";
 
 
@@ -114,6 +113,7 @@ public class TranslationImporter {
         return true;
     }
 
+
     // 加载提取成功的App
     private static void loadTranslations() {
         int aCount = 0;
@@ -126,9 +126,6 @@ public class TranslationImporter {
             if (fullPath == null) {
                 throw new RuntimeException("获取数据文件路径错误！");
             }
-
-            int shard = 0;
-            List<AppI18nInfo> shardList = new ArrayList<>();
 
             String line;
             List<String> packageLanguages = new ArrayList<>();
@@ -150,22 +147,99 @@ public class TranslationImporter {
                 }
 
                 AppI18nInfo appI18nInfo = parseAppI18nInfo(items);
-
-                if (shard < SHARD_TOTAL) {
-                    shardList.add(appI18nInfo);
-                    shard++;
-                } else {
-                    aCount += updateAppTrans(shardList);
-                    shardList.clear();
-                    shard = 0;
+                if (appI18nInfo == null || appI18nInfo.getAppId() == -1) {
+                    messLog.error("Parse app info by json error, package: {}, language: {}", items[0], items[1]);
+                    continue;
                 }
+
+                aCount += updateAppTrans(appI18nInfo);
 //                cCount += insertComments(appI18nInfo);
 
                 if (appI18nInfo.getTransed() == 0 || appI18nInfo.getTransed() == 1) {
                     packageLanguages.add(appI18nInfo.getPackageName() + ":" + appI18nInfo.getLanguage());
                 }
 
-                if (offset % SHARD_TOTAL == 0) {
+                if (offset % 50 == 0) {
+                    IOUtil.writeOffsetLog(offset, importOffsetLog);
+                    messLog.error("截止现在，导入：{} 个App描述，导入：{} 个App评论，循环offset：{} 行", aCount, cCount, offset);
+
+                    IOUtil.writeDataLog(packageLanguages, importDataLog);
+                }
+
+            }
+        } catch (Exception e) {
+            messLog.error("读取翻译文件异常！", e);
+        } finally {
+            try {
+                if (reader != null) {
+                    reader.close();
+                }
+            } catch (IOException e) {
+                messLog.error("读取翻译文件流关闭异常！", e);
+            }
+        }
+
+        IOUtil.writeOffsetLog(offset, importOffsetLog);
+        messLog.error("提取结束，导入：{} 个App描述，导入：{} 个App评论，循环offset：{} 行", aCount, cCount, offset);
+    }
+
+    private static void loadTranslations1() {
+        int aCount = 0;
+        int cCount = 0;
+        int offset = IOUtil.loadOffset(importOffsetLog); // 首次获取为-1
+
+        BufferedReader reader = null;
+        try {
+            String fullPath = IOUtil.getFile(importDataFile);
+            if (fullPath == null) {
+                throw new RuntimeException("获取数据文件路径错误！");
+            }
+
+            int shardTotal = 500;
+            int shard = 0;
+            List<AppI18nInfo> shardList=new ArrayList<>();
+            String line;
+            List<String> packageLanguages = new ArrayList<>();
+            reader = new BufferedReader(new InputStreamReader(new FileInputStream(fullPath)));
+            for (int i = 0; (line = reader.readLine()) != null; i++) {
+                if (i <= offset) {
+                    continue;
+                }
+                offset = i;
+
+                if (line.trim().startsWith("#")) {
+                    continue;
+                }
+
+                String[] items = parseJson(line);
+                if (items == null) {
+                    messLog.error("Parse app info by json error, json: {}", line);
+                    continue;
+                }
+
+                AppI18nInfo appI18nInfo = parseAppI18nInfo1(items);
+//                if (appI18nInfo == null || appI18nInfo.getAppId() == -1) {
+//                    messLog.error("Parse app info by json error, package: {}, language: {}", items[0], items[1]);
+//                    continue;
+//                }
+
+                if(shard<shardTotal){
+                    shardList.add(appI18nInfo);
+                    shard++;
+                } else {
+                    aCount += updateAppTrans1(shardList);
+                    shardList.clear();
+                    shard = 0;
+                }
+
+
+//                cCount += insertComments(appI18nInfo);
+
+                if (appI18nInfo.getTransed() == 0 || appI18nInfo.getTransed() == 1) {
+                    packageLanguages.add(appI18nInfo.getPackageName() + ":" + appI18nInfo.getLanguage());
+                }
+
+                if (offset % 50 == 0) {
                     IOUtil.writeOffsetLog(offset, importOffsetLog);
                     messLog.error("截止现在，导入：{} 个App描述，导入：{} 个App评论，循环offset：{} 行", aCount, cCount, offset);
 
@@ -197,10 +271,10 @@ public class TranslationImporter {
         Map<String, Integer> idMap = queryAppIds(packageNames);
 
 
-        Map<Integer, List<AppI18nInfo>> appI18nInfoMap = new HashMap<>();
+        Map<Integer, List<AppI18nInfo>> appI18nInfoMap=new HashMap<>();
         for (AppI18nInfo appI18nInfo : AppI18nInfos) {
             Integer appId = idMap.get(appI18nInfo.getPackageName());
-            if (appId < 1) {
+            if(appId < 1){
                 messLog.error("PackageName: {} not found appId", appI18nInfo.getPackageName());
                 continue;
             }
@@ -209,35 +283,14 @@ public class TranslationImporter {
             // app翻译表已做分表处理
             int tabNo = appId % 20;
 
-            if (appI18nInfoMap.get(tabNo) == null) {
-                appI18nInfoMap.put(tabNo, new ArrayList<AppI18nInfo>());
+            if(appI18nInfoMap.get(tabNo) == null){
+                appI18nInfoMap.put(tabNo,new ArrayList<AppI18nInfo>());
             }
 
             appI18nInfoMap.get(tabNo).add(appI18nInfo);
         }
 
         return appI18nInfoMap;
-    }
-
-    private static int updateAppTrans(List<AppI18nInfo> appI18nInfos) {
-        Set<String> packageNames = new HashSet<>();
-        for (AppI18nInfo appPackageInfo : appI18nInfos) {
-            packageNames.add(appPackageInfo.getPackageName());
-        }
-        Map<String, Integer> appIdMap = queryAppIds(packageNames);
-
-        int row = 0;
-        for (AppI18nInfo appI18nInfo : appI18nInfos) {
-            int appId = appIdMap.get(appI18nInfo.getPackageName());
-            if(appId < 1){
-                messLog.error("PackageName: {} not found appId", appI18nInfo.getPackageName());
-                continue;
-            }
-            appI18nInfo.setAppId(appId);
-
-            row += updateAppTrans(appI18nInfo);
-        }
-        return row;
     }
 
     private static int updateAppTrans(AppI18nInfo appI18nInfo) {
@@ -248,11 +301,11 @@ public class TranslationImporter {
 
         // app翻译表已做分表处理
         int tabNo = appI18nInfo.getAppId() % 20;
-//        if (appI18nInfo.getAppId() % 2 == 0) {
-//            tabNo = 8;
-//        } else {
-//            tabNo = 9;
-//        }
+        if (appI18nInfo.getAppId() % 2 == 0) {
+            tabNo = 8;
+        } else {
+            tabNo = 9;
+        }
         String sql = "INSERT INTO os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
                 " VALUES (?, ?, ?, ?, ?)" +
                 " ON DUPLICATE KEY UPDATE app_name = ?, app_summary = ?, description = ?";
@@ -278,12 +331,58 @@ public class TranslationImporter {
             row = acStmt.executeUpdate(); // 因增加set子句，执行后返回行数0
 
         } catch (Exception e) {
-            row = 0;
             messLog.error("更新翻译时发生异常:", e);
+            row = 0;
         }
 
         return row;
     }
+
+
+
+    private static int updateAppTrans1(List<AppI18nInfo> AppI18nInfos) {
+        int row = 0;
+        Map<Integer, List<AppI18nInfo>> appI18nInfoMap = groupAppI18nInfo(AppI18nInfos);
+        try {
+            for (Map.Entry<Integer, List<AppI18nInfo>> entry : appI18nInfoMap.entrySet()) {
+                int tabNo = entry.getKey();
+                tabNo = tabNo % 2 == 0 ? 8 : 9;
+                PreparedStatement acStmt = acStmtMap.get(String.valueOf(tabNo));
+                if (acStmt == null) {
+                    acConn.prepareStatement("SET NAMES utf8mb4").executeQuery();
+                    String sql = "INSERT INTO os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
+                            " VALUES (?, ?, ?, ?, ?)" +
+                            " ON DUPLICATE KEY UPDATE app_name = ?, app_summary = ?, description = ?";
+                    acStmt = acConn.prepareStatement(sql);
+                    acStmtMap.put(String.valueOf(tabNo), acStmt);
+                }
+                List<AppI18nInfo> appI18nInfos = entry.getValue();
+                for (AppI18nInfo appI18nInfo : appI18nInfos) {
+                    messLog.info("tabNo: {}, appId: {}, appPackage: {}, language: {}", tabNo, appI18nInfo.getAppId(), appI18nInfo.getPackageName(), appI18nInfo.getLanguage());
+                    acStmt.setInt(1, appI18nInfo.getAppId());
+                    acStmt.setString(2, appI18nInfo.getName());
+                    acStmt.setString(3, appI18nInfo.getSummary());
+                    acStmt.setString(4, appI18nInfo.getDescription());
+                    acStmt.setString(5, appI18nInfo.getLanguage());
+                    acStmt.setString(6, appI18nInfo.getName());
+                    acStmt.setString(7, appI18nInfo.getSummary());
+                    acStmt.setString(8, appI18nInfo.getDescription());
+                    acStmt.addBatch();
+                }
+
+                int[] count = acStmt.executeBatch();
+                for (int i : count) {
+                    row += i;
+                }
+            }
+        } catch (Exception e) {
+            messLog.error("更新翻译时发生异常:", e);
+            row = 0;
+        }
+
+        return row;
+    }
+
 
     private static int insertComments(AppI18nInfo appI18nInfo) {
         int row = 0;
@@ -507,6 +606,53 @@ public class TranslationImporter {
         String packageName = items[0];
         String language = items[1];
 
+        int id = queryAppId(packageName);
+        if (id == -1) {
+            messLog.error("query app id by package name error, app package:{}", packageName);
+            return null;
+        }
+
+        // 转换App翻译
+        AppI18nInfo appI18nInfo = JSON.parseObject(items[2], AppI18nInfo.class);
+        appI18nInfo.setAppId(id);
+        if (language.startsWith("zh")) {
+            language = language.replace("-", "_");
+        } else if (language.length() > 2) {
+            language = language.substring(0, 2);
+        }
+        appI18nInfo.setLanguage(language);
+
+
+        // 格式化描述
+        appI18nInfo.setDescription(formatDesc(appI18nInfo.getDescription()));
+
+        // 设置App摘要
+        if (appI18nInfo.getDescription() != null && appI18nInfo.getDescription().length() > 128) {
+            appI18nInfo.setSummary(appI18nInfo.getDescription().substring(0, 128));
+        } else {
+            appI18nInfo.setSummary(appI18nInfo.getDescription());
+        }
+
+        // 设置App评论
+        List<CommentInfo> commentInfos = appI18nInfo.getCommentInfoList();
+        if (commentInfos != null && commentInfos.size() > 0) {
+            for (CommentInfo commentInfo : commentInfos) {
+                commentInfo.setAppId(id);
+                commentInfo.setPackageName(packageName);
+                commentInfo.setLanguage(language);
+                if (commentInfo.getStarRating() == null) {
+                    commentInfo.setStarRating(0f);
+                }
+            }
+        }
+
+        return appI18nInfo;
+    }
+
+    private static AppI18nInfo parseAppI18nInfo1(String[] items) {
+        String packageName = items[0];
+        String language = items[1];
+
         // 转换App翻译
         AppI18nInfo appI18nInfo = JSON.parseObject(items[2], AppI18nInfo.class);
         if (language.startsWith("zh")) {
@@ -671,7 +817,7 @@ public class TranslationImporter {
         }
 
         long b = System.currentTimeMillis();
-        loadTranslations();
+        loadTranslations1();
         long e = System.currentTimeMillis();
 
         closeConn();  // 关闭连接
