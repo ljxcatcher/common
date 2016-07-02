@@ -248,11 +248,6 @@ public class TranslationImporter {
 
         // app翻译表已做分表处理
         int tabNo = appI18nInfo.getAppId() % 20;
-//        if (appI18nInfo.getAppId() % 2 == 0) {
-//            tabNo = 8;
-//        } else {
-//            tabNo = 9;
-//        }
         String sql = "INSERT INTO os_b_translation_app_" + tabNo + "(app_id, app_name, app_summary, description, `language`)" +
                 " VALUES (?, ?, ?, ?, ?)" +
                 " ON DUPLICATE KEY UPDATE app_name = ?, app_summary = ?, description = ?";
