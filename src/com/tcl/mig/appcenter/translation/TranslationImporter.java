@@ -42,17 +42,23 @@ public class TranslationImporter {
     private static String importNewlineFlag[];
     private static String importEndlineFlag[];
 
+    private static String tcDbUrl;
+    private static String tcDbUsername;
+    private static String tcDbPassword;
+
     private static String acDbUrl;
     private static String acDbUsername;
     private static String acDbPassword;
+
     private static String ucDbUrl;
     private static String ucDbUsername;
     private static String ucDbPassword;
 
-    private static Connection acConn; // App翻译
+    private static Connection acConn; // App中心
+    private static Connection tcConn; // App翻译
     private static Connection ucConn; // 用户评论
     private static PreparedStatement idStmt;
-    private static Map<String, PreparedStatement> acStmtMap = new HashMap<>();
+    private static Map<String, PreparedStatement> tcStmtMap = new HashMap<>();
     private static Map<String, PreparedStatement> ucStmtMap = new HashMap<>();
 
 
@@ -92,6 +98,10 @@ public class TranslationImporter {
         acDbUrl = configMap.get("ac.db.url");
         acDbUsername = configMap.get("ac.db.username");
         acDbPassword = configMap.get("ac.db.password");
+
+        tcDbUrl = configMap.get("tc.db.url");
+        tcDbUsername = configMap.get("tc.db.username");
+        tcDbPassword = configMap.get("tc.db.password");
 
         ucDbUrl = configMap.get("uc.db.url");
         ucDbUsername = configMap.get("uc.db.username");
@@ -258,23 +268,23 @@ public class TranslationImporter {
         messLog.info("tabNo: {}, appId: {}, appPackage: {}, language: {}", tabNo, appI18nInfo.getAppId(), appI18nInfo.getPackageName(), appI18nInfo.getLanguage());
 
         try {
-            PreparedStatement acStmt = acStmtMap.get(String.valueOf(tabNo));
-            if (acStmt == null) {
-                acConn.prepareStatement("SET NAMES utf8mb4").executeQuery();
-                acStmt = acConn.prepareStatement(sql);
-                acStmtMap.put(String.valueOf(tabNo), acStmt);
+            PreparedStatement tcStmt = tcStmtMap.get(String.valueOf(tabNo));
+            if (tcStmt == null) {
+                tcConn.prepareStatement("SET NAMES utf8mb4").executeQuery();
+                tcStmt = tcConn.prepareStatement(sql);
+                tcStmtMap.put(String.valueOf(tabNo), tcStmt);
             }
 
-            acStmt.setInt(1, appI18nInfo.getAppId());
-            acStmt.setString(2, appI18nInfo.getName());
-            acStmt.setString(3, appI18nInfo.getSummary());
-            acStmt.setString(4, appI18nInfo.getDescription());
-            acStmt.setString(5, appI18nInfo.getLanguage());
-            acStmt.setString(6, appI18nInfo.getName());
-            acStmt.setString(7, appI18nInfo.getSummary());
-            acStmt.setString(8, appI18nInfo.getDescription());
+            tcStmt.setInt(1, appI18nInfo.getAppId());
+            tcStmt.setString(2, appI18nInfo.getName());
+            tcStmt.setString(3, appI18nInfo.getSummary());
+            tcStmt.setString(4, appI18nInfo.getDescription());
+            tcStmt.setString(5, appI18nInfo.getLanguage());
+            tcStmt.setString(6, appI18nInfo.getName());
+            tcStmt.setString(7, appI18nInfo.getSummary());
+            tcStmt.setString(8, appI18nInfo.getDescription());
 
-            row = acStmt.executeUpdate(); // 因增加set子句，执行后返回行数0
+            row = tcStmt.executeUpdate(); // 因增加set子句，执行后返回行数0
 
         } catch (Exception e) {
             row = 0;
@@ -392,27 +402,6 @@ public class TranslationImporter {
     }
 
     // 从数据库中查询需要验证的App
-    private static int queryAppId(String packageName) {
-        String sql = "SELECT id FROM ostore.os_app_entity WHERE app_package=?";
-        try {
-
-            if (idStmt == null) {
-                idStmt = acConn.prepareStatement(sql);
-            }
-
-            idStmt.setString(1, packageName);
-            ResultSet set = idStmt.executeQuery();
-            while (set.next()) {
-                return set.getInt("id");
-            }
-
-        } catch (Exception e) {
-            messLog.error("发生未知异常:", e);
-        }
-        return -1;
-    }
-
-    // 从数据库中查询需要验证的App
     private static Map<String, Integer> queryAppIds(Set<String> packageNames) {
         if (packageNames == null || packageNames.isEmpty()) {
             return new HashMap<>();
@@ -429,7 +418,7 @@ public class TranslationImporter {
             sb.deleteCharAt(sb.length() - 1);
         }
 
-        String sql = "SELECT id, app_package FROM ostore.os_app_entity WHERE app_package in (" + sb.toString() + ")";
+        String sql = "SELECT id, app_package FROM os_app_entity WHERE app_package in (" + sb.toString() + ")";
         try {
             idStmt = acConn.prepareStatement(sql);
 
@@ -449,6 +438,7 @@ public class TranslationImporter {
         try {
             Class.forName("com.mysql.jdbc.Driver");
             acConn = DriverManager.getConnection(acDbUrl, acDbUsername, acDbPassword);
+            tcConn = DriverManager.getConnection(tcDbUrl, tcDbUsername, tcDbPassword);
             ucConn = DriverManager.getConnection(ucDbUrl, ucDbUsername, ucDbPassword);
         } catch (Exception e) {
             messLog.error("创建数据库连接异常！", e);
@@ -463,8 +453,15 @@ public class TranslationImporter {
                 messLog.error("关闭idStmt异常！", e);
             }
         }
-        if (!acStmtMap.isEmpty()) {
-            for (Map.Entry<String, PreparedStatement> entry : acStmtMap.entrySet()) {
+        if (tcConn != null) {
+            try {
+                tcConn.close();
+            } catch (SQLException e) {
+                messLog.error("关闭tcConn异常！", e);
+            }
+        }
+        if (!tcStmtMap.isEmpty()) {
+            for (Map.Entry<String, PreparedStatement> entry : tcStmtMap.entrySet()) {
                 if (entry.getValue() != null) {
                     try {
                         entry.getValue().close();
