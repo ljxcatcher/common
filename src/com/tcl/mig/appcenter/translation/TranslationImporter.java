@@ -120,15 +120,15 @@ public class TranslationImporter {
         int cCount = 0;
         int offset = IOUtil.loadOffset(importOffsetLog); // 首次获取为-1
 
+        int shard = 0;
+        List<AppI18nInfo> shardList = new ArrayList<>();
+
         BufferedReader reader = null;
         try {
             String fullPath = IOUtil.getFile(importDataFile);
             if (fullPath == null) {
                 throw new RuntimeException("获取数据文件路径错误！");
             }
-
-            int shard = 0;
-            List<AppI18nInfo> shardList = new ArrayList<>();
 
             String line;
             List<String> packageLanguages = new ArrayList<>();
@@ -184,6 +184,10 @@ public class TranslationImporter {
                 messLog.error("读取翻译文件流关闭异常！", e);
             }
         }
+
+        aCount += updateAppTrans(shardList);
+        shardList.clear();
+        shard = 0;
 
         IOUtil.writeOffsetLog(offset, importOffsetLog);
         messLog.error("提取结束，导入：{} 个App描述，导入：{} 个App评论，循环offset：{} 行", aCount, cCount, offset);
