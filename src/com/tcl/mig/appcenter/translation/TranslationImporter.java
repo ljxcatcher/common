@@ -196,12 +196,10 @@ public class TranslationImporter {
             }
         }
 
+        // 写入剩余相关数据
         aCount += updateAppTrans(shardList);
-        shardList.clear();
-        shard = 0;
         IOUtil.writeOffsetLog(offset, importOffsetLog);
         IOUtil.writeDataLog(packageLanguages, importDataLog);
-        packageLanguages.clear();
 
         messLog.error("提取结束，导入：{} 个App描述，导入：{} 个App评论，循环offset：{} 行", aCount, cCount, offset);
     }
