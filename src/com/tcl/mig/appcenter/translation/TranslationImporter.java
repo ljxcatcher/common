@@ -132,6 +132,7 @@ public class TranslationImporter {
 
         int shard = 0;
         List<AppI18nInfo> shardList = new ArrayList<>();
+        List<String> packageLanguages = new ArrayList<>();
 
         BufferedReader reader = null;
         try {
@@ -141,7 +142,6 @@ public class TranslationImporter {
             }
 
             String line;
-            List<String> packageLanguages = new ArrayList<>();
             reader = new BufferedReader(new InputStreamReader(new FileInputStream(fullPath)));
             for (int i = 0; (line = reader.readLine()) != null; i++) {
                 if (i <= offset) {
@@ -180,6 +180,7 @@ public class TranslationImporter {
                     messLog.error("截止现在，导入：{} 个App描述，导入：{} 个App评论，循环offset：{} 行", aCount, cCount, offset);
 
                     IOUtil.writeDataLog(packageLanguages, importDataLog);
+                    packageLanguages.clear();
                 }
 
             }
@@ -198,39 +199,11 @@ public class TranslationImporter {
         aCount += updateAppTrans(shardList);
         shardList.clear();
         shard = 0;
-
         IOUtil.writeOffsetLog(offset, importOffsetLog);
+        IOUtil.writeDataLog(packageLanguages, importDataLog);
+        packageLanguages.clear();
+
         messLog.error("提取结束，导入：{} 个App描述，导入：{} 个App评论，循环offset：{} 行", aCount, cCount, offset);
-    }
-
-    private static Map<Integer, List<AppI18nInfo>> groupAppI18nInfo(List<AppI18nInfo> AppI18nInfos) {
-        Set<String> packageNames = new HashSet<>();
-        for (AppI18nInfo appPackageInfo : AppI18nInfos) {
-            packageNames.add(appPackageInfo.getPackageName());
-        }
-        Map<String, Integer> idMap = queryAppIds(packageNames);
-
-
-        Map<Integer, List<AppI18nInfo>> appI18nInfoMap = new HashMap<>();
-        for (AppI18nInfo appI18nInfo : AppI18nInfos) {
-            Integer appId = idMap.get(appI18nInfo.getPackageName());
-            if (appId < 1) {
-                messLog.error("PackageName: {} not found appId", appI18nInfo.getPackageName());
-                continue;
-            }
-            appI18nInfo.setAppId(appId);
-
-            // app翻译表已做分表处理
-            int tabNo = appId % 20;
-
-            if (appI18nInfoMap.get(tabNo) == null) {
-                appI18nInfoMap.put(tabNo, new ArrayList<AppI18nInfo>());
-            }
-
-            appI18nInfoMap.get(tabNo).add(appI18nInfo);
-        }
-
-        return appI18nInfoMap;
     }
 
     private static int updateAppTrans(List<AppI18nInfo> appI18nInfos) {
