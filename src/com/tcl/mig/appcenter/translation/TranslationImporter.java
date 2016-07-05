@@ -128,7 +128,7 @@ public class TranslationImporter {
     private static void loadTranslations() {
         int aCount = 0;
         int cCount = 0;
-        int offset = IOUtil.loadOffset(importOffsetLog); // 首次获取为-1
+        int offset = IOUtil.loadOffsetLog(importOffsetLog); // 首次获取为-1
 
         int shard = 0;
         List<AppI18nInfo> shardList = new ArrayList<>();

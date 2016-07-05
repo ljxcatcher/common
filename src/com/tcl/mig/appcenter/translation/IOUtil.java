@@ -11,6 +11,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,11 +37,11 @@ public class IOUtil {
     }
 
     // 加载所有待提取的App
-    public static int loadOffset(String importOffsetLog) {
+    public static int loadOffsetLog(String offsetFile) {
         BufferedReader buffer = null;
         try {
 
-            String fullPath = getFile(importOffsetLog);
+            String fullPath = getFile(offsetFile);
             if (fullPath == null) {
                 throw new RuntimeException("获取数据文件路径错误！");
             }
@@ -67,13 +68,38 @@ public class IOUtil {
         return -1;
     }
 
-    // 写数据
-    public static int writeData(String data, String importDataLog) {
+
+    public static int writeOffsetLog(int offset, String offsetFile) {
         PrintWriter writer = null;
         try {
-            String fullPath = getFile("") + importDataLog;
+            String fullPath = getFile("") + offsetFile;
+            writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath, false)));
+            writer.println(offset);
+        } catch (Exception e) {
+            messLog.error("写入offset异常！", e);
+        } finally {
+            if (writer != null) {
+                try {
+                    writer.close();
+                } catch (Exception e) {
+                    messLog.error("关闭写入offset流异常！", e);
+                }
+            }
+        }
+
+        return 0;
+    }
+
+
+    // 写数据
+    public static int writeData(List<String> dataList, String dataFile) {
+        PrintWriter writer = null;
+        try {
+            String fullPath = getFile("") + dataFile;
             writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath, true)));
-            writer.println(data);
+            for (String data : dataList) {
+                writer.println(data);
+            }
         } catch (Exception e) {
             messLog.error("写入包名和语言异常！", e);
         } finally {
@@ -89,10 +115,43 @@ public class IOUtil {
         return 0;
     }
 
-    public static int writeDataLog(List<String> packageLanguages, String importDataLog) {
+    // 加载所有待提取的App
+    public static List<String> loadDataLog(String dataLogFile) {
+        List<String> logs = new ArrayList<>();
+
+        BufferedReader buffer = null;
+        try {
+            String fullPath = getFile(dataLogFile);
+            if (fullPath == null) {
+                throw new RuntimeException("获取数据文件路径错误！");
+            }
+
+            buffer = new BufferedReader(new InputStreamReader(new FileInputStream(fullPath)));
+            String line;
+            while ((line = buffer.readLine()) != null) {
+                if (!line.trim().startsWith("#")) {
+                    logs.add(line);
+                }
+            }
+        } catch (Exception e) {
+            messLog.error("读取范围ID配置异常！", e);
+        } finally {
+            if (buffer != null) {
+                try {
+                    buffer.close();
+                } catch (IOException e) {
+                    messLog.error("关闭配置读取流异常！", e);
+                }
+            }
+        }
+
+        return logs;
+    }
+
+    public static int writeDataLog(List<String> packageLanguages, String dataLogFile) {
         PrintWriter writer = null;
         try {
-            String fullPath = getFile("") + importDataLog;
+            String fullPath = getFile("") + dataLogFile;
             writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath)), true);
             for (String pl : packageLanguages) {
                 writer.println(pl);
@@ -105,27 +164,6 @@ public class IOUtil {
                     writer.close();
                 } catch (Exception e) {
                     messLog.error("关闭写入包名和语言流异常！", e);
-                }
-            }
-        }
-
-        return 0;
-    }
-
-    public static int writeOffsetLog(int offset, String importOffsetLog) {
-        PrintWriter writer = null;
-        try {
-            String fullPath = getFile("") + importOffsetLog;
-            writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath, false)));
-            writer.println(offset);
-        } catch (Exception e) {
-            messLog.error("写入offset异常！", e);
-        } finally {
-            if (writer != null) {
-                try {
-                    writer.close();
-                } catch (Exception e) {
-                    messLog.error("关闭写入offset流异常！", e);
                 }
             }
         }
