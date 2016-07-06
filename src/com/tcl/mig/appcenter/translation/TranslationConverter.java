@@ -21,8 +21,8 @@ import java.util.List;
 public class TranslationConverter {
     private final static Logger messLog = LoggerFactory.getLogger(TranslationConverter.class);
 
-    private static String dataFile = "converter.data.txt";
-    private static String offsetFile = "converter.offset.txt";
+    private static String dataFile = "convert.data.txt";
+    private static String offsetFile = "convert.offset.txt";
 
 
     // 加载提取成功的App
