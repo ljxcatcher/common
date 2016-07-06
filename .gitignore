@@ -8,3 +8,4 @@ out
 *.iml
 generatorConfig.xml
 doc
+logs

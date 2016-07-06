@@ -76,7 +76,7 @@ public class TranslationConverter {
                     descriptionList.add(line);
                 } else {
 
-                    if(packageName.equals(items[0])){
+                     if(packageName.equals(items[0])){
                         isOtherPackageName = false;
                         descriptionList.add(line);
                     } else {
@@ -97,7 +97,7 @@ public class TranslationConverter {
                     okCount += jsonList.size();
                     IOUtil.writeData(jsonList, dataFile);
                     descriptionList.clear(); // 注：需要清空
-                    messLog.error("截止现在，替换了：{} 个App描述，循环offset：{} 行", okCount, offset);
+                    messLog.info("截至现在，总共替换了：{} 个App描述，循环offset：{} 行", okCount, offset);
                 }
             }
 
@@ -122,7 +122,7 @@ public class TranslationConverter {
         okCount += jsonList.size();
         IOUtil.writeData(jsonList, dataFile);
         descriptionList.clear(); // 注：需要清空
-        messLog.error("截止现在，替换了：{} 个App描述，循环offset：{} 行", okCount, offset);
+        messLog.error("截至现在，替换了：{} 个App描述，循环offset：{} 行", okCount, offset);
     }
 
 
@@ -155,7 +155,7 @@ public class TranslationConverter {
             newAppI18nInfos = replace(appI18nInfos, appI18nInfo.getDescription());
             if (newAppI18nInfos != null && newAppI18nInfos.size() > 0) {
                 messLog.info("PackageName: {}, 默认语言: {}, 共替换了: {} 个翻译", appI18nInfo.getPackageName(), appI18nInfo.getLanguage(), newAppI18nInfos.size());
-                break; // 某个App中，所有语言中只有一种默认语言
+                break; // 某个App中，所有语言中只有一种默认语言，所以替换默认语言后直接跳出循环
             }
         }
 
