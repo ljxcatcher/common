@@ -122,7 +122,7 @@ public class TranslationConverter {
         okCount += jsonList.size();
         IOUtil.writeData(jsonList, dataFile);
         descriptionList.clear(); // 注：需要清空
-        messLog.error("截至现在，替换了：{} 个App描述，循环offset：{} 行", okCount, offset);
+        messLog.info("截至现在，替换了：{} 个App描述，循环offset：{} 行", okCount, offset);
     }
 
 

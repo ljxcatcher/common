@@ -6,6 +6,7 @@ bin
 out
 .idea
 *.iml
+*.bak
 generatorConfig.xml
 doc
 logs
