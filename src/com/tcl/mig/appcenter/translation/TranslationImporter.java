@@ -583,7 +583,7 @@ public class TranslationImporter {
                 c1 = description.charAt(--idx);
             }
 
-            if (c1 != ' ' && c1 != '\t') {
+            if (idx <= 0 || (c1 != ' ' && c1 != '\t')) {
                 break;
             } else {
                 c2 = c1; // 有些描述在新行符前面有空格没标点符号

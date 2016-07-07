@@ -152,7 +152,7 @@ public class IOUtil {
         PrintWriter writer = null;
         try {
             String fullPath = getFile("") + dataLogFile;
-            writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath)), true);
+            writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream(fullPath, true)), true);
             for (String pl : packageLanguages) {
                 writer.println(pl);
             }
